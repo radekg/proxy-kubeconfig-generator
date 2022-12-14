@@ -10,9 +10,9 @@ import (
 
 	"k8s.io/client-go/kubernetes"
 
-	"github.com/maxgio92/proxy-kubeconfig-generator/pkg/configuration"
-	"github.com/maxgio92/proxy-kubeconfig-generator/pkg/generator"
-	"github.com/maxgio92/proxy-kubeconfig-generator/pkg/utils"
+	"github.com/radekg/proxy-kubeconfig-generator/pkg/configuration"
+	"github.com/radekg/proxy-kubeconfig-generator/pkg/generator"
+	"github.com/radekg/proxy-kubeconfig-generator/pkg/utils"
 )
 
 var appConfig = new(configuration.Config)

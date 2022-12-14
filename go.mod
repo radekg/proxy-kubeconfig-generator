@@ -1,4 +1,4 @@
-module github.com/maxgio92/proxy-kubeconfig-generator
+module github.com/radekg/proxy-kubeconfig-generator
 
 go 1.18
 

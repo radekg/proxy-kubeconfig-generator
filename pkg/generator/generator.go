@@ -6,8 +6,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 
-	"github.com/maxgio92/proxy-kubeconfig-generator/pkg/configuration"
-	"github.com/maxgio92/proxy-kubeconfig-generator/pkg/utils"
+	"github.com/radekg/proxy-kubeconfig-generator/pkg/configuration"
+	"github.com/radekg/proxy-kubeconfig-generator/pkg/utils"
 )
 
 const (

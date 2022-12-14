@@ -7,8 +7,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/maxgio92/proxy-kubeconfig-generator/pkg/configuration"
-	"github.com/maxgio92/proxy-kubeconfig-generator/pkg/utils"
+	"github.com/radekg/proxy-kubeconfig-generator/pkg/configuration"
+	"github.com/radekg/proxy-kubeconfig-generator/pkg/utils"
 	"k8s.io/client-go/kubernetes"
 )
 
