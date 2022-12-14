@@ -1,45 +1,38 @@
 package main
 
 import (
+	"context"
 	"flag"
-	"fmt"
+	"os"
+	"os/signal"
+	"sync"
+	"time"
 
 	"k8s.io/client-go/kubernetes"
 
+	"github.com/maxgio92/proxy-kubeconfig-generator/pkg/configuration"
 	"github.com/maxgio92/proxy-kubeconfig-generator/pkg/generator"
 	"github.com/maxgio92/proxy-kubeconfig-generator/pkg/utils"
 )
 
-const (
-	DefaultTLSecretCAKey       = "ca"
-	DefaultNamespace           = "default"
-	DefaultKubeconfigSecretKey = "kubeconfig"
-)
+var appConfig = new(configuration.Config)
 
 func main() {
-	serviceAccountName := flag.String("serviceaccount", "", "The name of the service account for which to create the kubeconfig")
-	namespace := flag.String("namespace", DefaultNamespace, "(optional) The namespace of the service account and where the kubeconfig secret will be created.")
-	server := flag.String("server", "", "The server url of the kubeconfig where API requests will be sent")
-	serverTLSSecretNamespace := flag.String("server-tls-secret-namespace", DefaultNamespace, "(optional) The namespace of the server TLS secret.")
-	serverTLSSecretName := flag.String("server-tls-secret-name", "", "The server TLS secret name")
-	serverTLSSecretCAKey := flag.String("server-tls-secret-ca-key", DefaultTLSecretCAKey, "(optional) The CA key in the server TLS secret.")
-	kubeconfigSecretKey := flag.String("kubeconfig-secret-key", DefaultKubeconfigSecretKey, "(optional) The key of the kubeconfig in the secret that will be created")
+
+	flag.StringVar(&appConfig.ServiceAccountName, "serviceaccount", "", "The name of the service account for which to create the kubeconfig")
+	flag.StringVar(&appConfig.Namespace, "namespace", configuration.DefaultNamespace, "(optional) The namespace of the service account and where the kubeconfig secret will be created.")
+	flag.StringVar(&appConfig.Server, "server", "", "The server url of the kubeconfig where API requests will be sent")
+	flag.StringVar(&appConfig.ServerTLSSecretNamespace, "server-tls-secret-namespace", configuration.DefaultNamespace, "(optional) The namespace of the server TLS secret.")
+	flag.StringVar(&appConfig.ServerTLSSecretName, "server-tls-secret-name", "", "The server TLS secret name")
+	flag.StringVar(&appConfig.ServerTLSSecretCAKey, "server-tls-secret-ca-key", configuration.DefaultTLSecretCAKey, "(optional) The CA key in the server TLS secret.")
+	flag.StringVar(&appConfig.KubeConfigSecretKey, "kubeconfig-secret-key", configuration.DefaultKubeconfigSecretKey, "(optional) The key of the kubeconfig in the secret that will be created")
+	flag.DurationVar(&appConfig.IterationInterval, "iteration-interval", configuration.DefaultIterationInterval, "(optional) How long to wait between iterations")
 
 	flag.Parse()
 
-	if *serviceAccountName == "" {
+	if err := appConfig.Validate(); err != nil {
 		flag.Usage()
-		panic(fmt.Errorf("missing service account name"))
-	}
-
-	if *server == "" {
-		flag.Usage()
-		panic(fmt.Errorf("missing server url"))
-	}
-
-	if *serverTLSSecretName == "" {
-		flag.Usage()
-		panic(fmt.Errorf("missing server TLS secret name"))
+		panic(err)
 	}
 
 	config, err := utils.BuildClientConfig()
@@ -49,15 +42,49 @@ func main() {
 
 	clientset := kubernetes.NewForConfigOrDie(config)
 
-	tenantConfig, err := generator.GenerateProxyKubeconfigFromSA(clientset, *serviceAccountName, *namespace, *server, *serverTLSSecretName, *serverTLSSecretCAKey, *serverTLSSecretNamespace, *kubeconfigSecretKey)
-	if err != nil {
+	// Execute at least once:
+	if err := runOnce(clientset, appConfig); err != nil {
 		panic(err)
 	}
 
-	err = utils.CreateKubeconfigSecret(clientset, tenantConfig, *namespace, *serviceAccountName+"-kubeconfig", *kubeconfigSecretKey)
-	if err != nil {
-		panic(err)
-	}
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	exitCtx, exitCtxCancelFunc := context.WithCancel(context.Background())
 
-	fmt.Println("Proxy kubeconfig Secret created")
+	go func() {
+		for {
+			select {
+			case <-time.After(appConfig.IterationInterval):
+				runOnce(clientset, appConfig)
+			case <-exitCtx.Done():
+				// we're done
+				wg.Done()
+				return
+			}
+		}
+	}()
+
+	sigintc := make(chan os.Signal, 1)
+	signal.Notify(sigintc, os.Interrupt)
+
+	go func() {
+		<-sigintc
+		// Handle exit
+		exitCtxCancelFunc()
+	}()
+
+	wg.Wait()
+
+}
+
+func runOnce(clientset *kubernetes.Clientset, appConfig *configuration.Config) error {
+	tenantConfig, err := generator.GenerateProxyKubeconfigFromSA(clientset, appConfig)
+	if err != nil {
+		return err
+	}
+	err = utils.CreateKubeconfigSecret(clientset, tenantConfig, appConfig)
+	if err != nil {
+		return err
+	}
+	return nil
 }

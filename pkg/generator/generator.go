@@ -6,6 +6,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 
+	"github.com/maxgio92/proxy-kubeconfig-generator/pkg/configuration"
 	"github.com/maxgio92/proxy-kubeconfig-generator/pkg/utils"
 )
 
@@ -18,9 +19,10 @@ const (
 // Generates a Secret containing a Kubeconfig with the specified
 // Service Account's token and server URL and CA certificate from
 // the specified Secret.
-func GenerateProxyKubeconfigFromSA(clientset *kubernetes.Clientset, serviceAccountName string, namespace string, server string, serverTLSSecretName string, serverTLSSecretCAKey string, serverTLSSecretNamespace string, kubeconfigSecretKey string) (*clientcmdapi.Config, error) {
+func GenerateProxyKubeconfigFromSA(clientset *kubernetes.Clientset, appConfig *configuration.Config) (*clientcmdapi.Config, error) {
+	/* serviceAccountName string, namespace string, server string, serverTLSSecretName string, serverTLSSecretCAKey string, serverTLSSecretNamespace string, kubeconfigSecretKey string*/
 	// Get Tenant Service Account token
-	saSecret, err := utils.GetServiceAccountSecret(clientset, serviceAccountName, namespace)
+	saSecret, err := utils.GetServiceAccountSecret(clientset, appConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -29,13 +31,13 @@ func GenerateProxyKubeconfigFromSA(clientset *kubernetes.Clientset, serviceAccou
 	}
 
 	// Get Server Proxy CA certificate
-	proxyCA, err := utils.GetSecretField(clientset, serverTLSSecretName, serverTLSSecretCAKey, serverTLSSecretNamespace)
+	proxyCA, err := utils.GetSecretField(clientset, appConfig)
 	if err != nil {
 		return nil, err
 	}
 
 	// Generate the client Config for the Tenant Owner
-	tenantConfig, err := utils.BuildKubeconfigFromToken(saSecret.Data["token"], proxyCA, server, serverTLSSecretNamespace)
+	tenantConfig, err := utils.BuildKubeconfigFromToken(saSecret.Data["token"], proxyCA, appConfig)
 	if err != nil {
 		return nil, err
 	}

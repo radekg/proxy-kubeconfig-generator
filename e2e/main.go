@@ -7,6 +7,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/maxgio92/proxy-kubeconfig-generator/pkg/configuration"
 	"github.com/maxgio92/proxy-kubeconfig-generator/pkg/utils"
 	"k8s.io/client-go/kubernetes"
 )
@@ -18,6 +19,13 @@ const (
 )
 
 func main() {
+
+	appConfig := &configuration.Config{
+		ServiceAccountName:  ServiceAccountName,
+		KubeConfigSecretKey: KubeconfigSecretKey,
+		Namespace:           Namespace,
+	}
+
 	config, err := utils.BuildClientConfig()
 	if err != nil {
 		panic(err)
@@ -26,7 +34,7 @@ func main() {
 	clientset := kubernetes.NewForConfigOrDie(config)
 
 	// Retrieve the Kubeconfig secret and build a new client Config
-	tenantClientConfig, err := utils.BuildClientConfigFromSecret(clientset, ServiceAccountName+"-kubeconfig", KubeconfigSecretKey, Namespace)
+	tenantClientConfig, err := utils.BuildClientConfigFromSecret(clientset, appConfig)
 	if err != nil {
 		panic(err)
 	}
