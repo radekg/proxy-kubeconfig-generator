@@ -86,7 +86,11 @@ func CreateKubeConfigSecret(opArgs OperationArgs, kubeconfig *clientcmdapi.Confi
 		},
 	}
 	if opArgs.AppConfig().ReportOnly {
-		opArgs.Logger().Info("Report only: would create a secret", "namespace", opArgs.AppConfig().TargetNamespace)
+		opArgs.Logger().Info("Report only: would create a secret",
+			"namespace", opArgs.AppConfig().TargetNamespace,
+			"secret-name", opArgs.AppConfig().TenantSecretName(),
+			"secret-key", opArgs.AppConfig().KubeConfigSecretKey,
+			"secret-data-size", len(configBuffer))
 	} else {
 		_, err = opArgs.ClientSet().CoreV1().Secrets(opArgs.AppConfig().TargetNamespace).Create(
 			context.Background(),
