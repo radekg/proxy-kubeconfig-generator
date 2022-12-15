@@ -3,6 +3,8 @@ package configuration
 import (
 	"fmt"
 	"time"
+
+	"github.com/hashicorp/go-hclog"
 )
 
 const (
@@ -21,6 +23,10 @@ type Config struct {
 	ServerTLSSecretCAKey     string
 	KubeConfigSecretKey      string
 	IterationInterval        time.Duration
+
+	MetricsBindHostPort string
+	URIPathMetrics      string
+	URIPathHealth       string
 }
 
 func (c *Config) TenantSecretName() string {
@@ -40,4 +46,29 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("missing server TLS secret name")
 	}
 	return nil
+}
+
+type LogConfig struct {
+	LogLevel      string
+	LogColor      bool
+	LogForceColor bool
+	LogAsJSON     bool
+}
+
+// NewLogger returns a new configured logger.
+func (c *LogConfig) NewLogger(name string) hclog.Logger {
+	loggerColorOption := hclog.ColorOff
+	if c.LogColor {
+		loggerColorOption = hclog.AutoColor
+	}
+	if c.LogForceColor {
+		loggerColorOption = hclog.ForceColor
+	}
+
+	return hclog.New(&hclog.LoggerOptions{
+		Name:       name,
+		Level:      hclog.LevelFromString(c.LogLevel),
+		Color:      loggerColorOption,
+		JSONFormat: c.LogAsJSON,
+	})
 }
