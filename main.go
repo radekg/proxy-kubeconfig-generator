@@ -30,6 +30,7 @@ func initFlags() {
 	flag.StringVar(&appConfig.ServerTLSSecretName, "server-tls-secret-name", "", "The server TLS secret name")
 	flag.StringVar(&appConfig.ServerTLSSecretCAKey, "server-tls-secret-ca-key", configuration.DefaultTLSecretCAKey, "(optional) The CA key in the server TLS secret.")
 	flag.StringVar(&appConfig.KubeConfigSecretKey, "kubeconfig-secret-key", configuration.DefaultKubeConfigSecretKey, "(optional) The key of the kubeconfig in the secret that will be created")
+	flag.StringVar(&appConfig.SourceSecretRevisionLabel, "source-secret-revision-label", configuration.DefaultSourceSecretResourceVersionLabel, "(optional) Label of the target secret where the last know source secret resource version is stored")
 	flag.DurationVar(&appConfig.IterationInterval, "iteration-interval", configuration.DefaultIterationInterval, "(optional) How long to wait between iterations")
 	flag.BoolVar(&appConfig.DisallowUpdates, "disallow-updates", false, "(optional) When set, program does not update existing secrets")
 	flag.BoolVar(&appConfig.ReportOnly, "report-only", false, "(optional) When set, program does not mutate anything, only logs what would have been done")
@@ -140,11 +141,11 @@ func program() int {
 }
 
 func runOnce(opArgs k8s.OperationArgs) error {
-	tenantConfig, err := generator.GenerateProxyKubeConfigFromSA(opArgs)
+	sourceSecret, tenantConfig, err := generator.GenerateProxyKubeConfigFromSA(opArgs)
 	if err != nil { // Logging taken care of.
 		return err
 	}
-	err = k8s.CreateOrUpdateKubeConfigSecret(opArgs, tenantConfig)
+	err = k8s.CreateOrUpdateKubeConfigSecret(opArgs, tenantConfig, sourceSecret)
 	if err != nil { // Logging taken care of.
 		return err
 	}

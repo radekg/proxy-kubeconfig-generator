@@ -14,19 +14,22 @@ const (
 	DefaultNamespace = "default"
 	// DefaultKubeConfigSecretKey is the default kubeconfig secret key.
 	DefaultKubeConfigSecretKey = "kubeconfig"
+	// DefaultSourceSecretResourceVersionLabel label of the target secret where the last know source secret resource version is stored.
+	DefaultSourceSecretResourceVersionLabel = "proxy-kubeconfig-generator/last-known-source-resource-version"
 	// DefaultIterationInterval is the default interval between individual iterations.
 	DefaultIterationInterval = time.Second * 10
 )
 
 type Config struct {
-	ServiceAccountName       string
-	TargetNamespace          string
-	Server                   string
-	ServerTLSSecretNamespace string
-	ServerTLSSecretName      string
-	ServerTLSSecretCAKey     string
-	KubeConfigSecretKey      string
-	IterationInterval        time.Duration
+	ServiceAccountName        string
+	TargetNamespace           string
+	Server                    string
+	ServerTLSSecretNamespace  string
+	ServerTLSSecretName       string
+	ServerTLSSecretCAKey      string
+	KubeConfigSecretKey       string
+	SourceSecretRevisionLabel string
+	IterationInterval         time.Duration
 
 	DisallowUpdates bool
 	ReportOnly      bool

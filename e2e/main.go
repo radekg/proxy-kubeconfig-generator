@@ -22,7 +22,12 @@ const (
 )
 
 func BuildClientConfigFromSecret(opArgs k8s.OperationArgs) (*rest.Config, error) {
-	o, err := k8s.GetSourceSecretField(opArgs)
+	s, err := k8s.GetSourceSecret(opArgs)
+	if err != nil {
+		return nil, err
+	}
+
+	o, err := k8s.GetSourceSecretField(s, opArgs)
 	if err != nil {
 		return nil, err
 	}
