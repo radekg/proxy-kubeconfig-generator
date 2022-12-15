@@ -2,6 +2,7 @@ package configuration
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/hashicorp/go-hclog"
@@ -17,12 +18,29 @@ const (
 	// DefaultSourceSecretResourceVersionLabel label of the target secret where the last know source secret resource version is stored.
 	DefaultSourceSecretResourceVersionLabel = "proxy-kubeconfig-generator/last-known-source-resource-version"
 	// DefaultIterationInterval is the default interval between individual iterations.
-	DefaultIterationInterval = time.Second * 10
+	DefaultIterationInterval = time.Second * 60
 )
+
+type NamespaceSelectorLabels struct {
+	Values []string
+}
+
+func (i *NamespaceSelectorLabels) String() string {
+	if i.Values == nil {
+		return "<not set>"
+	}
+	return strings.Join(i.Values, ", ")
+}
+
+func (i *NamespaceSelectorLabels) Set(value string) error {
+	i.Values = append(i.Values, value)
+	return nil
+}
 
 type Config struct {
 	ServiceAccountName        string
 	TargetNamespace           string
+	TargetNamespaceSelector   NamespaceSelectorLabels
 	Server                    string
 	ServerTLSSecretNamespace  string
 	ServerTLSSecretName       string

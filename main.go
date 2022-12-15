@@ -25,6 +25,7 @@ func initFlags() {
 	// Main program flags
 	flag.StringVar(&appConfig.ServiceAccountName, "serviceaccount", "", "The name of the service account for which to create the kubeconfig")
 	flag.StringVar(&appConfig.TargetNamespace, "namespace", configuration.DefaultNamespace, "(optional) The namespace of the service account and where the kubeconfig secret will be created.")
+	flag.Var(&appConfig.TargetNamespaceSelector, "namespace-label-selector", "(optional) The namespace of the service account and where the kubeconfig secret will be created.")
 	flag.StringVar(&appConfig.Server, "server", "", "The server url of the kubeconfig where API requests will be sent")
 	flag.StringVar(&appConfig.ServerTLSSecretNamespace, "server-tls-secret-namespace", configuration.DefaultNamespace, "(optional) The namespace of the server TLS secret.")
 	flag.StringVar(&appConfig.ServerTLSSecretName, "server-tls-secret-name", "", "The server TLS secret name")
@@ -46,7 +47,11 @@ func initFlags() {
 }
 
 func initConfigs() {
-	appConfig = new(configuration.Config)
+	appConfig = &configuration.Config{
+		TargetNamespaceSelector: configuration.NamespaceSelectorLabels{
+			Values: []string{},
+		},
+	}
 	httpConfig = new(configuration.HttpConfig)
 	logConfig = new(configuration.LogConfig)
 }
@@ -94,23 +99,23 @@ func program() int {
 
 	opArgs := k8s.NewDefaultOperationArgs(appConfig, clientset, appLogger)
 
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	exitCtx, exitCtxCancelFunc := context.WithCancel(context.Background())
+
 	// Execute at least once:
-	if err := runOnce(opArgs); err != nil {
+	if err := runOnce(exitCtx, opArgs); err != nil {
 		appLogger.Error("kubeconfig generator failed to generate", "reason", err)
 		metrics.RecordFailure(appConfig)
 	} else {
 		metrics.RecordSuccess(appConfig)
 	}
 
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	exitCtx, exitCtxCancelFunc := context.WithCancel(context.Background())
-
 	go func() {
 		for {
 			select {
 			case <-time.After(appConfig.IterationInterval):
-				if err := runOnce(opArgs); err != nil {
+				if err := runOnce(exitCtx, opArgs); err != nil {
 					appLogger.Error("kubeconfig generator failed to generate", "reason", err)
 					metrics.RecordFailure(appConfig)
 				} else {
@@ -140,7 +145,20 @@ func program() int {
 	return 0
 }
 
-func runOnce(opArgs k8s.OperationArgs) error {
+func runOnce(ctx context.Context, opArgs k8s.OperationArgs) error {
+
+	if len(appConfig.TargetNamespaceSelector.Values) > 0 {
+		opArgs.Logger().Info("Namespace selectors defined, looking up namespaces...")
+		namespaceList, err := k8s.FindNamespaces(ctx, opArgs)
+		if err != nil {
+			opArgs.Logger().Error("Failed loading namespace list", "reason", err)
+		} else {
+			for _, ns := range namespaceList.Items {
+				opArgs.Logger().Info(" =======> namespace found", ns.Name)
+			}
+		}
+	}
+
 	sourceSecret, tenantConfig, err := generator.GenerateProxyKubeConfigFromSA(opArgs)
 	if err != nil { // Logging taken care of.
 		return err
