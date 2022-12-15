@@ -18,7 +18,7 @@ import (
 // Runner represents a snapshot coordinator runner.
 type Runner interface {
 	Close()
-	Start(appConfig *configuration.Config) utils.StartStatus
+	Start(appConfig *configuration.HttpConfig) utils.StartStatus
 }
 
 // NewDefaultRunner returns an unconfigured and not started
@@ -43,7 +43,7 @@ func (r *defaultRunner) Close() {
 }
 
 // Start starts this server instance.
-func (r *defaultRunner) Start(appConfig *configuration.Config) utils.StartStatus {
+func (r *defaultRunner) Start(appConfig *configuration.HttpConfig) utils.StartStatus {
 
 	status := utils.NewDefaultStartStatus()
 

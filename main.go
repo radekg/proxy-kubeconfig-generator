@@ -17,10 +17,11 @@ import (
 	"github.com/radekg/proxy-kubeconfig-generator/pkg/utils"
 )
 
-var appConfig = new(configuration.Config)
-var logConfig = new(configuration.LogConfig)
+var appConfig *configuration.Config
+var httpConfig *configuration.HttpConfig
+var logConfig *configuration.LogConfig
 
-func main() {
+func initFlags() {
 	flag.StringVar(&appConfig.ServiceAccountName, "serviceaccount", "", "The name of the service account for which to create the kubeconfig")
 	flag.StringVar(&appConfig.Namespace, "namespace", configuration.DefaultNamespace, "(optional) The namespace of the service account and where the kubeconfig secret will be created.")
 	flag.StringVar(&appConfig.Server, "server", "", "The server url of the kubeconfig where API requests will be sent")
@@ -33,16 +34,28 @@ func main() {
 	flag.BoolVar(&logConfig.LogAsJSON, "log-as-json", false, "Log as JSON")
 	flag.BoolVar(&logConfig.LogColor, "log-color", false, "Log color")
 	flag.BoolVar(&logConfig.LogForceColor, "log-force-color", false, "Force log color output")
-	flag.StringVar(&appConfig.MetricsBindHostPort, "metrics-server-bind-host-port", ":10000", "Host port to bind the metrics server on")
-	flag.StringVar(&appConfig.URIPathHealth, "uri-path-health", "/health", "URI path at which the health endpoint responds")
-	flag.StringVar(&appConfig.URIPathMetrics, "uri-path-metrics", "/metrics", "URI path at which the metrics endpoint responds")
-
-	flag.Parse()
-
-	os.Exit(run())
+	flag.StringVar(&httpConfig.MetricsBindHostPort, "metrics-server-bind-host-port", ":10000", "Host port to bind the metrics server on")
+	flag.StringVar(&httpConfig.URIPathHealth, "uri-path-health", "/health", "URI path at which the health endpoint responds")
+	flag.StringVar(&httpConfig.URIPathMetrics, "uri-path-metrics", "/metrics", "URI path at which the metrics endpoint responds")
 }
 
-func run() int {
+func initConfigs() {
+	appConfig = new(configuration.Config)
+	httpConfig = new(configuration.HttpConfig)
+	logConfig = new(configuration.LogConfig)
+}
+
+func init() {
+	initConfigs()
+	initFlags()
+}
+
+func main() {
+	flag.Parse()
+	os.Exit(program())
+}
+
+func program() int {
 
 	appLogger := logConfig.NewLogger("generator")
 
@@ -65,7 +78,7 @@ func run() int {
 	}
 
 	serverRunner := server.NewDefaultRunner(appLogger.Named("server"))
-	status := serverRunner.Start(appConfig)
+	status := serverRunner.Start(httpConfig)
 	select {
 	case <-status.OnStarted():
 	case err := <-status.OnError():

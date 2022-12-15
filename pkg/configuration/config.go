@@ -23,10 +23,6 @@ type Config struct {
 	ServerTLSSecretCAKey     string
 	KubeConfigSecretKey      string
 	IterationInterval        time.Duration
-
-	MetricsBindHostPort string
-	URIPathMetrics      string
-	URIPathHealth       string
 }
 
 func (c *Config) TenantSecretName() string {
@@ -46,6 +42,12 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("missing server TLS secret name")
 	}
 	return nil
+}
+
+type HttpConfig struct {
+	MetricsBindHostPort string
+	URIPathMetrics      string
+	URIPathHealth       string
 }
 
 type LogConfig struct {
