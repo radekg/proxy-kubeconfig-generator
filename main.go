@@ -31,6 +31,7 @@ func initFlags() {
 	flag.StringVar(&appConfig.ServerTLSSecretCAKey, "server-tls-secret-ca-key", configuration.DefaultTLSecretCAKey, "(optional) The CA key in the server TLS secret.")
 	flag.StringVar(&appConfig.KubeConfigSecretKey, "kubeconfig-secret-key", configuration.DefaultKubeConfigSecretKey, "(optional) The key of the kubeconfig in the secret that will be created")
 	flag.DurationVar(&appConfig.IterationInterval, "iteration-interval", configuration.DefaultIterationInterval, "(optional) How long to wait between iterations")
+	flag.BoolVar(&appConfig.DisallowUpdates, "disallow-updates", false, "(optional) When set, program does not update existing secrets")
 	flag.BoolVar(&appConfig.ReportOnly, "report-only", false, "(optional) When set, program does not mutate anything, only logs what would have been done")
 	// Logging flags
 	flag.StringVar(&logConfig.LogLevel, "log-level", "info", "Log level")
@@ -143,7 +144,7 @@ func runOnce(opArgs k8s.OperationArgs) error {
 	if err != nil { // Logging taken care of.
 		return err
 	}
-	err = k8s.CreateKubeConfigSecret(opArgs, tenantConfig)
+	err = k8s.CreateOrUpdateKubeConfigSecret(opArgs, tenantConfig)
 	if err != nil { // Logging taken care of.
 		return err
 	}

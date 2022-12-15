@@ -6,6 +6,7 @@ import (
 
 	"github.com/hashicorp/go-hclog"
 	corev1 "k8s.io/api/core/v1"
+	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -69,29 +70,98 @@ func BuildKubernetesClientConfig(logger hclog.Logger) (*rest.Config, error) {
 	return config, nil
 }
 
-// CreateKubeConfigSecret creates a kubeconfig secret in the target namespace.
-func CreateKubeConfigSecret(opArgs OperationArgs, kubeconfig *clientcmdapi.Config) error {
+// CreateOrUpdateKubeConfigSecret creates or updates a kubeconfig secret in the target namespace.
+func CreateOrUpdateKubeConfigSecret(opArgs OperationArgs, kubeconfig *clientcmdapi.Config) error {
+
+	existingSecret, err := opArgs.ClientSet().CoreV1().Secrets(opArgs.AppConfig().TargetNamespace).Get(
+		context.Background(),
+		opArgs.AppConfig().TenantSecretName(),
+		metav1.GetOptions{})
+
+	if err != nil {
+		if !apiErrors.IsAlreadyExists(err) {
+			opArgs.Logger().Error("Failed checking if secret exists",
+				"namespace", opArgs.AppConfig().TargetNamespace,
+				"secret-name", opArgs.AppConfig().TenantSecretName(),
+				"reason", err)
+			return err
+		}
+	}
+
 	configBuffer, err := clientcmd.Write(*kubeconfig)
 	if err != nil {
 		opArgs.Logger().Error("Failed serializing kubeconfig to buffer",
 			"reason", err)
 		return err
 	}
+
+	// Just a skeleton of a secret, maybe we use the existing one.
 	secret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: opArgs.AppConfig().TenantSecretName(),
-		},
-		Data: map[string][]byte{
-			opArgs.AppConfig().KubeConfigSecretKey: configBuffer,
-		},
+		ObjectMeta: metav1.ObjectMeta{},
+		Data:       map[string][]byte{},
 	}
-	if opArgs.AppConfig().ReportOnly {
-		opArgs.Logger().Info("Report only: would create a secret",
+
+	if existingSecret != nil {
+
+		if opArgs.AppConfig().DisallowUpdates {
+			opArgs.Logger().Info("Secret already exists and updates are disabled",
+				"namespace", opArgs.AppConfig().TargetNamespace,
+				"secret-name", opArgs.AppConfig().TenantSecretName(),
+				"existing-secret-generation", existingSecret.Generation,
+				"existing-secret-resource-version", existingSecret.ResourceVersion)
+			return fmt.Errorf("secret '%s' already exists in namespace '%s'", opArgs.AppConfig().TenantSecretName(), opArgs.AppConfig().TargetNamespace)
+		}
+
+		opArgs.Logger().Info("Secret already exists, will be updated",
 			"namespace", opArgs.AppConfig().TargetNamespace,
 			"secret-name", opArgs.AppConfig().TenantSecretName(),
 			"secret-key", opArgs.AppConfig().KubeConfigSecretKey,
+			"existing-secret-generation", existingSecret.Generation,
+			"existing-secret-resource-version", existingSecret.ResourceVersion,
 			"secret-data-size", len(configBuffer))
+		secret = existingSecret.DeepCopy()
 	} else {
+		secret.ObjectMeta.Name = opArgs.AppConfig().TenantSecretName()
+	}
+
+	secret.Data[opArgs.AppConfig().KubeConfigSecretKey] = configBuffer
+
+	if opArgs.AppConfig().ReportOnly {
+		if existingSecret != nil {
+			opArgs.Logger().Info("Report only: would update a secret",
+				"namespace", opArgs.AppConfig().TargetNamespace,
+				"secret-name", opArgs.AppConfig().TenantSecretName(),
+				"secret-key", opArgs.AppConfig().KubeConfigSecretKey,
+				"existing-secret-generation", existingSecret.Generation,
+				"existing-secret-resource-version", existingSecret.ResourceVersion,
+				"secret-data-size", len(configBuffer))
+		} else {
+			opArgs.Logger().Info("Report only: would create a secret",
+				"namespace", opArgs.AppConfig().TargetNamespace,
+				"secret-name", opArgs.AppConfig().TenantSecretName(),
+				"secret-key", opArgs.AppConfig().KubeConfigSecretKey,
+				"secret-data-size", len(configBuffer))
+		}
+		return nil
+	}
+
+	if existingSecret != nil {
+
+		_, err = opArgs.ClientSet().CoreV1().Secrets(opArgs.AppConfig().TargetNamespace).Update(
+			context.Background(),
+			secret,
+			metav1.UpdateOptions{},
+		)
+		if err != nil {
+			opArgs.Logger().Error("Failed updating secret",
+				"target-namespace", opArgs.AppConfig().TenantSecretName(),
+				"secret-key", opArgs.AppConfig().KubeConfigSecretKey,
+				"reason", err)
+			return err
+		}
+
+	} else {
+
 		_, err = opArgs.ClientSet().CoreV1().Secrets(opArgs.AppConfig().TargetNamespace).Create(
 			context.Background(),
 			secret,
@@ -104,7 +174,9 @@ func CreateKubeConfigSecret(opArgs OperationArgs, kubeconfig *clientcmdapi.Confi
 				"reason", err)
 			return err
 		}
+
 	}
+
 	return nil
 }
 

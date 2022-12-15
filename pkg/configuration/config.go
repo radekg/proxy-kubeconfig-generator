@@ -28,7 +28,8 @@ type Config struct {
 	KubeConfigSecretKey      string
 	IterationInterval        time.Duration
 
-	ReportOnly bool
+	DisallowUpdates bool
+	ReportOnly      bool
 }
 
 func (c *Config) TenantSecretName() string {
