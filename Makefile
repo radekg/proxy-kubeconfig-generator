@@ -15,7 +15,7 @@ build: fmt vet ## Build manager binary.
 
 .PHONY: test
 test:
-	go test ./... -v -count-1
+	go test ./... -v -count=1
 
 .PHONY: docker-build
 docker-build: test ## Build docker image with the manager.
