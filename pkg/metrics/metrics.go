@@ -29,16 +29,16 @@ func init() {
 	prometheus.Register(generatorFailureCounters)
 }
 
-func RecordSuccess(appConfig *configuration.Config) {
+func RecordSuccess(appConfig *configuration.Config, namespace string) {
 	generatorSuccessCounters.WithLabelValues(appConfig.ServiceAccountName,
 		appConfig.ServerTLSSecretName,
-		appConfig.TargetNamespace,
+		namespace,
 		appConfig.TenantSecretName()).Inc()
 }
 
-func RecordFailure(appConfig *configuration.Config) {
+func RecordFailure(appConfig *configuration.Config, namespace string) {
 	generatorFailureCounters.WithLabelValues(appConfig.ServiceAccountName,
 		appConfig.ServerTLSSecretName,
-		appConfig.TargetNamespace,
+		namespace,
 		appConfig.TenantSecretName()).Inc()
 }

@@ -17,12 +17,13 @@ const (
 	// DefaultSourceSecretResourceVersionLabel label of the target secret where the last know source secret resource version is stored.
 	DefaultSourceSecretResourceVersionLabel = "proxy-kubeconfig-generator/last-known-source-resource-version"
 	// DefaultIterationInterval is the default interval between individual iterations.
-	DefaultIterationInterval = time.Second * 10
+	DefaultIterationInterval = time.Second * 60
 )
 
 type Config struct {
+	NamespaceFromCLI          string
 	ServiceAccountName        string
-	TargetNamespace           string
+	TargetNamespaceSelector   NamespaceSelectorLabels
 	Server                    string
 	ServerTLSSecretNamespace  string
 	ServerTLSSecretName       string

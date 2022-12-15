@@ -1,6 +1,7 @@
 package generator
 
 import (
+	"context"
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
@@ -11,10 +12,10 @@ import (
 
 // GenerateProxyKubeConfigFromSA generates a Secret containing a Kubeconfig with the specified
 // Service Account's token and server URL and CA certificate from the specified Secret.
-func GenerateProxyKubeConfigFromSA(opArgs k8s.OperationArgs) (*corev1.Secret, *clientcmdapi.Config, error) {
+func GenerateProxyKubeConfigFromSA(ctx context.Context, targetNamespace string, opArgs k8s.OperationArgs) (*corev1.Secret, *clientcmdapi.Config, error) {
 	/* serviceAccountName string, namespace string, server string, serverTLSSecretName string, serverTLSSecretCAKey string, serverTLSSecretNamespace string, kubeconfigSecretKey string*/
 	// Get Tenant Service Account token
-	saSecret, err := k8s.GetServiceAccountSecret(opArgs)
+	saSecret, err := k8s.GetServiceAccountSecret(ctx, targetNamespace, opArgs)
 	if err != nil { // Logging taken care of.
 		return nil, nil, err
 	}
