@@ -29,7 +29,7 @@ func initFlags() {
 	flag.StringVar(&appConfig.ServerTLSSecretNamespace, "server-tls-secret-namespace", configuration.DefaultNamespace, "(optional) The namespace of the server TLS secret.")
 	flag.StringVar(&appConfig.ServerTLSSecretName, "server-tls-secret-name", "", "The server TLS secret name")
 	flag.StringVar(&appConfig.ServerTLSSecretCAKey, "server-tls-secret-ca-key", configuration.DefaultTLSecretCAKey, "(optional) The CA key in the server TLS secret.")
-	flag.StringVar(&appConfig.KubeConfigSecretKey, "kubeconfig-secret-key", configuration.DefaultKubeconfigSecretKey, "(optional) The key of the kubeconfig in the secret that will be created")
+	flag.StringVar(&appConfig.KubeConfigSecretKey, "kubeconfig-secret-key", configuration.DefaultKubeConfigSecretKey, "(optional) The key of the kubeconfig in the secret that will be created")
 	flag.DurationVar(&appConfig.IterationInterval, "iteration-interval", configuration.DefaultIterationInterval, "(optional) How long to wait between iterations")
 	flag.BoolVar(&appConfig.ReportOnly, "report-only", false, "(optional) When set, program does not mutate anything, only logs what would have been done")
 	// Logging flags
@@ -69,7 +69,7 @@ func program() int {
 		return 1
 	}
 
-	config, err := k8s.BuildClientConfig(appLogger)
+	config, err := k8s.BuildKubernetesClientConfig(appLogger)
 	if err != nil {
 		appLogger.Error("Failed building client configuration", "reason", err)
 		return 1
@@ -139,12 +139,12 @@ func program() int {
 }
 
 func runOnce(opArgs k8s.OperationArgs) error {
-	tenantConfig, err := generator.GenerateProxyKubeconfigFromSA(opArgs)
-	if err != nil {
+	tenantConfig, err := generator.GenerateProxyKubeConfigFromSA(opArgs)
+	if err != nil { // Logging taken care of.
 		return err
 	}
-	err = k8s.CreateKubeconfigSecret(opArgs, tenantConfig)
-	if err != nil {
+	err = k8s.CreateKubeConfigSecret(opArgs, tenantConfig)
+	if err != nil { // Logging taken care of.
 		return err
 	}
 	return nil

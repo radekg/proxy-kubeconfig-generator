@@ -11,6 +11,8 @@ import (
 	"github.com/radekg/proxy-kubeconfig-generator/pkg/configuration"
 	"github.com/radekg/proxy-kubeconfig-generator/pkg/k8s"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 const (
@@ -18,6 +20,25 @@ const (
 	KubeconfigSecretKey = "kubeconfig"
 	Namespace           = "default"
 )
+
+func BuildClientConfigFromSecret(opArgs k8s.OperationArgs) (*rest.Config, error) {
+	o, err := k8s.GetSourceSecretField(opArgs)
+	if err != nil {
+		return nil, err
+	}
+
+	c, err := clientcmd.NewClientConfigFromBytes(o)
+	if err != nil {
+		return nil, err
+	}
+
+	config, err := c.ClientConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	return config, nil
+}
 
 func main() {
 
@@ -29,7 +50,7 @@ func main() {
 
 	logger := hclog.Default()
 
-	config, err := k8s.BuildClientConfig(logger)
+	config, err := k8s.BuildKubernetesClientConfig(logger)
 	if err != nil {
 		panic(err)
 	}
@@ -39,7 +60,7 @@ func main() {
 	opArgs := k8s.NewDefaultOperationArgs(appConfig, clientset, logger)
 
 	// Retrieve the Kubeconfig secret and build a new client Config
-	tenantClientConfig, err := k8s.BuildClientConfigFromSecret(opArgs)
+	tenantClientConfig, err := BuildClientConfigFromSecret(opArgs)
 	if err != nil {
 		panic(err)
 	}

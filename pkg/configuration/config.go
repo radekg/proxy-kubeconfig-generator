@@ -8,10 +8,14 @@ import (
 )
 
 const (
-	DefaultTLSecretCAKey       = "ca"
-	DefaultNamespace           = "default"
-	DefaultKubeconfigSecretKey = "kubeconfig"
-	DefaultIterationInterval   = time.Second * 10
+	// DefaultTLSecretCAKey is the default TLS secret CA key.
+	DefaultTLSecretCAKey = "ca.crt"
+	// DefaultNamespace is the default target namespace.
+	DefaultNamespace = "default"
+	// DefaultKubeConfigSecretKey is the default kubeconfig secret key.
+	DefaultKubeConfigSecretKey = "kubeconfig"
+	// DefaultIterationInterval is the default interval between individual iterations.
+	DefaultIterationInterval = time.Second * 10
 )
 
 type Config struct {
