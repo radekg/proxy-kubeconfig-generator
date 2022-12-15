@@ -108,19 +108,20 @@ func program() int {
 	}
 
 	// Execute at least once:
-	if err := runOnce(exitCtx, opArgs); err != nil {
-		appLogger.Error("kubeconfig generator failed to generate", "reason", err)
+	if errs := runOnce(exitCtx, opArgs); len(errs) > 0 {
+		for ns, err := range errs {
+			appLogger.Error("kubeconfig generator failed to generate", "namespace", ns, "reason", err)
+		}
 	}
 
 	go func() {
 		for {
 			select {
 			case <-time.After(appConfig.IterationInterval):
-				if err := runOnce(exitCtx, opArgs); err != nil {
-					appLogger.Error("kubeconfig generator failed to generate", "reason", err)
-
-				} else {
-
+				if errs := runOnce(exitCtx, opArgs); len(errs) > 0 {
+					for ns, err := range errs {
+						appLogger.Error("kubeconfig generator failed to generate", "namespace", ns, "reason", err)
+					}
 				}
 			case <-exitCtx.Done():
 				appLogger.Info("stopping run loop")
@@ -146,10 +147,9 @@ func program() int {
 	return 0
 }
 
-func runOnce(ctx context.Context, opArgs k8s.OperationArgs) error {
-
+func runOnce(ctx context.Context, opArgs k8s.OperationArgs) map[string]error {
+	errors := map[string]error{}
 	namespaces := []string{opArgs.AppConfig().NamespaceFromCLI}
-
 	if len(appConfig.TargetNamespaceSelector.Values) > 0 {
 		namespaceList, err := k8s.FindNamespaces(ctx, opArgs)
 		if err != nil {
@@ -165,19 +165,20 @@ func runOnce(ctx context.Context, opArgs k8s.OperationArgs) error {
 				"selectors", appConfig.TargetNamespaceSelector.Values)
 		}
 	}
-
 	for _, ns := range namespaces {
 		sourceSecret, tenantConfig, err := generator.GenerateProxyKubeConfigFromSA(ctx, ns, opArgs)
 		if err != nil { // Logging taken care of.
 			metrics.RecordFailure(appConfig, ns)
-			return err
+			errors[ns] = err
+			continue
 		}
 		err = k8s.CreateOrUpdateKubeConfigSecret(ctx, ns, opArgs, tenantConfig, sourceSecret)
 		if err != nil { // Logging taken care of.
 			metrics.RecordFailure(appConfig, ns)
-			return err
+			errors[ns] = err
+			continue
 		}
 		metrics.RecordSuccess(appConfig, ns)
 	}
-	return nil
+	return errors
 }
