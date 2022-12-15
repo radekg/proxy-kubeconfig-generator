@@ -2,7 +2,6 @@ package configuration
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/hashicorp/go-hclog"
@@ -21,25 +20,9 @@ const (
 	DefaultIterationInterval = time.Second * 60
 )
 
-type NamespaceSelectorLabels struct {
-	Values []string
-}
-
-func (i *NamespaceSelectorLabels) String() string {
-	if i.Values == nil {
-		return "<not set>"
-	}
-	return strings.Join(i.Values, ", ")
-}
-
-func (i *NamespaceSelectorLabels) Set(value string) error {
-	i.Values = append(i.Values, value)
-	return nil
-}
-
 type Config struct {
+	NamespaceFromCLI          string
 	ServiceAccountName        string
-	TargetNamespace           string
 	TargetNamespaceSelector   NamespaceSelectorLabels
 	Server                    string
 	ServerTLSSecretNamespace  string

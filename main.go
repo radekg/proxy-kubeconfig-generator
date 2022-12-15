@@ -24,12 +24,12 @@ var logConfig *configuration.LogConfig
 func initFlags() {
 	// Main program flags
 	flag.StringVar(&appConfig.ServiceAccountName, "serviceaccount", "", "The name of the service account for which to create the kubeconfig")
-	flag.StringVar(&appConfig.TargetNamespace, "namespace", configuration.DefaultNamespace, "(optional) The namespace of the service account and where the kubeconfig secret will be created.")
-	flag.Var(&appConfig.TargetNamespaceSelector, "namespace-label-selector", "(optional) The namespace of the service account and where the kubeconfig secret will be created.")
+	flag.StringVar(&appConfig.NamespaceFromCLI, "namespace", configuration.DefaultNamespace, "(optional) The namespace of the service account and where the kubeconfig secret will be created, ignored when selectors are in use")
+	flag.Var(&appConfig.TargetNamespaceSelector, "namespace-label-selector", "(optional) The namespace of the service account and where the kubeconfig secret will be created")
 	flag.StringVar(&appConfig.Server, "server", "", "The server url of the kubeconfig where API requests will be sent")
-	flag.StringVar(&appConfig.ServerTLSSecretNamespace, "server-tls-secret-namespace", configuration.DefaultNamespace, "(optional) The namespace of the server TLS secret.")
+	flag.StringVar(&appConfig.ServerTLSSecretNamespace, "server-tls-secret-namespace", configuration.DefaultNamespace, "(optional) The namespace of the server TLS secret")
 	flag.StringVar(&appConfig.ServerTLSSecretName, "server-tls-secret-name", "", "The server TLS secret name")
-	flag.StringVar(&appConfig.ServerTLSSecretCAKey, "server-tls-secret-ca-key", configuration.DefaultTLSecretCAKey, "(optional) The CA key in the server TLS secret.")
+	flag.StringVar(&appConfig.ServerTLSSecretCAKey, "server-tls-secret-ca-key", configuration.DefaultTLSecretCAKey, "(optional) The CA key in the server TLS secret")
 	flag.StringVar(&appConfig.KubeConfigSecretKey, "kubeconfig-secret-key", configuration.DefaultKubeConfigSecretKey, "(optional) The key of the kubeconfig in the secret that will be created")
 	flag.StringVar(&appConfig.SourceSecretRevisionLabel, "source-secret-revision-label", configuration.DefaultSourceSecretResourceVersionLabel, "(optional) Label of the target secret where the last know source secret resource version is stored")
 	flag.DurationVar(&appConfig.IterationInterval, "iteration-interval", configuration.DefaultIterationInterval, "(optional) How long to wait between iterations")
@@ -103,12 +103,13 @@ func program() int {
 	wg.Add(1)
 	exitCtx, exitCtxCancelFunc := context.WithCancel(context.Background())
 
+	if len(appConfig.TargetNamespaceSelector.Values) > 0 {
+		appLogger.Info("Namespace selectors defined, going to use namespace discovery instead of the --namespace value")
+	}
+
 	// Execute at least once:
 	if err := runOnce(exitCtx, opArgs); err != nil {
 		appLogger.Error("kubeconfig generator failed to generate", "reason", err)
-		metrics.RecordFailure(appConfig)
-	} else {
-		metrics.RecordSuccess(appConfig)
 	}
 
 	go func() {
@@ -117,9 +118,9 @@ func program() int {
 			case <-time.After(appConfig.IterationInterval):
 				if err := runOnce(exitCtx, opArgs); err != nil {
 					appLogger.Error("kubeconfig generator failed to generate", "reason", err)
-					metrics.RecordFailure(appConfig)
+
 				} else {
-					metrics.RecordSuccess(appConfig)
+
 				}
 			case <-exitCtx.Done():
 				appLogger.Info("stopping run loop")
@@ -147,25 +148,36 @@ func program() int {
 
 func runOnce(ctx context.Context, opArgs k8s.OperationArgs) error {
 
+	namespaces := []string{opArgs.AppConfig().NamespaceFromCLI}
+
 	if len(appConfig.TargetNamespaceSelector.Values) > 0 {
-		opArgs.Logger().Info("Namespace selectors defined, looking up namespaces...")
 		namespaceList, err := k8s.FindNamespaces(ctx, opArgs)
 		if err != nil {
 			opArgs.Logger().Error("Failed loading namespace list", "reason", err)
 		} else {
+			namespaces = []string{}
 			for _, ns := range namespaceList.Items {
-				opArgs.Logger().Info(" =======> namespace found", ns.Name)
+				namespaces = append(namespaces, ns.Name)
 			}
+			opArgs.Logger().Info("Discovered namespaces",
+				"number-of-namespaces", len(namespaces),
+				"namespaces", namespaces,
+				"selectors", appConfig.TargetNamespaceSelector.Values)
 		}
 	}
 
-	sourceSecret, tenantConfig, err := generator.GenerateProxyKubeConfigFromSA(opArgs)
-	if err != nil { // Logging taken care of.
-		return err
-	}
-	err = k8s.CreateOrUpdateKubeConfigSecret(opArgs, tenantConfig, sourceSecret)
-	if err != nil { // Logging taken care of.
-		return err
+	for _, ns := range namespaces {
+		sourceSecret, tenantConfig, err := generator.GenerateProxyKubeConfigFromSA(ctx, ns, opArgs)
+		if err != nil { // Logging taken care of.
+			metrics.RecordFailure(appConfig, ns)
+			return err
+		}
+		err = k8s.CreateOrUpdateKubeConfigSecret(ctx, ns, opArgs, tenantConfig, sourceSecret)
+		if err != nil { // Logging taken care of.
+			metrics.RecordFailure(appConfig, ns)
+			return err
+		}
+		metrics.RecordSuccess(appConfig, ns)
 	}
 	return nil
 }
