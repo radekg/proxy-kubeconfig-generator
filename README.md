@@ -32,21 +32,15 @@ proxy-kubeconfig-generator \
 
 ## Quick start
 
-### Build and pull the OCI image
-
-#### Pre-requisites
-- [`pack`](https://github.com/buildpacks/pack) Buildpack CLI
-- [KinD](https://kind.sigs.k8s.io)
-
-#### Build and load
+### Build and load
 
 ```
-pack build generator --path .
+make docker-build
 kind create cluster
 kind load docker-image generator:latest
 ```
 
-### Deploy the generator
+## Deploy the generator
 
 ```
 kubectl apply -k ./deploy/generator
