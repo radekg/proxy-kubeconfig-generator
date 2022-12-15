@@ -7,8 +7,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/hashicorp/go-hclog"
 	"github.com/radekg/proxy-kubeconfig-generator/pkg/configuration"
-	"github.com/radekg/proxy-kubeconfig-generator/pkg/utils"
+	"github.com/radekg/proxy-kubeconfig-generator/pkg/k8s"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -23,18 +24,22 @@ func main() {
 	appConfig := &configuration.Config{
 		ServiceAccountName:  ServiceAccountName,
 		KubeConfigSecretKey: KubeconfigSecretKey,
-		Namespace:           Namespace,
+		TargetNamespace:     Namespace,
 	}
 
-	config, err := utils.BuildClientConfig()
+	logger := hclog.Default()
+
+	config, err := k8s.BuildClientConfig(logger)
 	if err != nil {
 		panic(err)
 	}
 
 	clientset := kubernetes.NewForConfigOrDie(config)
 
+	opArgs := k8s.NewDefaultOperationArgs(appConfig, clientset, logger)
+
 	// Retrieve the Kubeconfig secret and build a new client Config
-	tenantClientConfig, err := utils.BuildClientConfigFromSecret(clientset, appConfig)
+	tenantClientConfig, err := k8s.BuildClientConfigFromSecret(opArgs)
 	if err != nil {
 		panic(err)
 	}

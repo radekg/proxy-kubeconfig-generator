@@ -32,13 +32,13 @@ func init() {
 func RecordSuccess(appConfig *configuration.Config) {
 	generatorSuccessCounters.WithLabelValues(appConfig.ServiceAccountName,
 		appConfig.ServerTLSSecretName,
-		appConfig.Namespace,
+		appConfig.TargetNamespace,
 		appConfig.TenantSecretName()).Inc()
 }
 
 func RecordFailure(appConfig *configuration.Config) {
 	generatorFailureCounters.WithLabelValues(appConfig.ServiceAccountName,
 		appConfig.ServerTLSSecretName,
-		appConfig.Namespace,
+		appConfig.TargetNamespace,
 		appConfig.TenantSecretName()).Inc()
 }

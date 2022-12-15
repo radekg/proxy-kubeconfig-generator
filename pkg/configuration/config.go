@@ -16,13 +16,15 @@ const (
 
 type Config struct {
 	ServiceAccountName       string
-	Namespace                string
+	TargetNamespace          string
 	Server                   string
 	ServerTLSSecretNamespace string
 	ServerTLSSecretName      string
 	ServerTLSSecretCAKey     string
 	KubeConfigSecretKey      string
 	IterationInterval        time.Duration
+
+	ReportOnly bool
 }
 
 func (c *Config) TenantSecretName() string {

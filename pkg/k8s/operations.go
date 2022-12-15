@@ -1,42 +1,37 @@
-package utils
+package k8s
 
 import (
 	"context"
 	"fmt"
 
-	"github.com/radekg/proxy-kubeconfig-generator/pkg/configuration"
+	"github.com/hashicorp/go-hclog"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
-func BuildClientConfig() (*rest.Config, error) {
+func BuildClientConfig(logger hclog.Logger) (*rest.Config, error) {
 	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
 	configOverrides := &clientcmd.ConfigOverrides{}
 	kubeConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, configOverrides)
-
 	config, err := kubeConfig.ClientConfig()
 	if err != nil {
-		fmt.Printf("error while trying to create a client config: %s", err)
-
+		logger.Error("error while trying to create a client config", "reason", err)
 		config, err = rest.InClusterConfig()
 		if err != nil {
 			return nil, err
 		}
-
 		return config, nil
 	}
-
 	return config, nil
 }
 
-func GetServiceAccountSecret(clientSet *kubernetes.Clientset, appConfig *configuration.Config) (*corev1.Secret, error) {
-	serviceAccount, err := clientSet.CoreV1().ServiceAccounts(appConfig.Namespace).Get(
+func GetServiceAccountSecret(opArgs OperationArgs) (*corev1.Secret, error) {
+	serviceAccount, err := opArgs.ClientSet().CoreV1().ServiceAccounts(opArgs.AppConfig().TargetNamespace).Get(
 		context.Background(),
-		appConfig.ServiceAccountName,
+		opArgs.AppConfig().ServiceAccountName,
 		metav1.GetOptions{},
 	)
 	if err != nil {
@@ -47,7 +42,7 @@ func GetServiceAccountSecret(clientSet *kubernetes.Clientset, appConfig *configu
 		return nil, fmt.Errorf("no secret found for the service account %s in namepsace %s", serviceAccount.Name, serviceAccount.Namespace)
 	}
 
-	saSecret, err := clientSet.CoreV1().Secrets(appConfig.Namespace).Get(
+	saSecret, err := opArgs.ClientSet().CoreV1().Secrets(opArgs.AppConfig().TargetNamespace).Get(
 		context.Background(),
 		serviceAccount.Secrets[0].Name,
 		metav1.GetOptions{},
@@ -59,22 +54,22 @@ func GetServiceAccountSecret(clientSet *kubernetes.Clientset, appConfig *configu
 	return saSecret, nil
 }
 
-func BuildKubeconfigFromToken(token []byte, CACertificate []byte, appConfig *configuration.Config) (*clientcmdapi.Config, error) {
+func BuildKubeconfigFromToken(token []byte, CACertificate []byte, opArgs OperationArgs) (*clientcmdapi.Config, error) {
 	clusters := make(map[string]*clientcmdapi.Cluster)
 	clusters["default"] = &clientcmdapi.Cluster{
-		Server:                   appConfig.Server,
+		Server:                   opArgs.AppConfig().Server,
 		CertificateAuthorityData: CACertificate,
 	}
 
 	contexts := make(map[string]*clientcmdapi.Context)
 	contexts["default"] = &clientcmdapi.Context{
 		Cluster:   "default",
-		Namespace: appConfig.ServerTLSSecretNamespace,
-		AuthInfo:  appConfig.ServerTLSSecretNamespace,
+		Namespace: opArgs.AppConfig().ServerTLSSecretNamespace,
+		AuthInfo:  opArgs.AppConfig().ServerTLSSecretNamespace,
 	}
 
 	authinfos := make(map[string]*clientcmdapi.AuthInfo)
-	authinfos[appConfig.ServerTLSSecretNamespace] = &clientcmdapi.AuthInfo{
+	authinfos[opArgs.AppConfig().ServerTLSSecretNamespace] = &clientcmdapi.AuthInfo{
 		Token: string(token),
 	}
 
@@ -95,21 +90,23 @@ func BuildKubeconfigFromToken(token []byte, CACertificate []byte, appConfig *con
 	return &config, nil
 }
 
-func CreateKubeconfigSecret(clientset *kubernetes.Clientset, kubeconfig *clientcmdapi.Config, appConfig *configuration.Config) error {
+func CreateKubeconfigSecret(opArgs OperationArgs, kubeconfig *clientcmdapi.Config) error {
 	configBuffer, err := clientcmd.Write(*kubeconfig)
 	if err != nil {
 		return err
 	}
-
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: appConfig.TenantSecretName(),
+			Name: opArgs.AppConfig().TenantSecretName(),
 		},
 		Data: map[string][]byte{
-			appConfig.KubeConfigSecretKey: configBuffer,
+			opArgs.AppConfig().KubeConfigSecretKey: configBuffer,
 		},
 	}
-	_, err = clientset.CoreV1().Secrets(appConfig.Namespace).Create(
+	if opArgs.AppConfig().ReportOnly {
+		opArgs.Logger().Info("Report only: would create a secret", "namespace", opArgs.AppConfig().TargetNamespace)
+	}
+	_, err = opArgs.ClientSet().CoreV1().Secrets(opArgs.AppConfig().TargetNamespace).Create(
 		context.Background(),
 		secret,
 		metav1.CreateOptions{},
@@ -121,26 +118,26 @@ func CreateKubeconfigSecret(clientset *kubernetes.Clientset, kubeconfig *clientc
 	return nil
 }
 
-func GetSecretField(clientset *kubernetes.Clientset, appConfig *configuration.Config) ([]byte, error) {
-	s, err := clientset.CoreV1().Secrets(appConfig.ServerTLSSecretNamespace).Get(
+func GetSecretField(opArgs OperationArgs) ([]byte, error) {
+	s, err := opArgs.ClientSet().CoreV1().Secrets(opArgs.AppConfig().ServerTLSSecretNamespace).Get(
 		context.Background(),
-		appConfig.ServerTLSSecretName,
+		opArgs.AppConfig().ServerTLSSecretName,
 		metav1.GetOptions{},
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	field, ok := s.Data[appConfig.ServerTLSSecretCAKey]
+	field, ok := s.Data[opArgs.AppConfig().ServerTLSSecretCAKey]
 	if !ok {
-		return nil, fmt.Errorf("no %s key for tenant kubeconfig secret %s", appConfig.ServerTLSSecretCAKey, s.Name)
+		return nil, fmt.Errorf("no %s key for tenant kubeconfig secret %s", opArgs.AppConfig().ServerTLSSecretCAKey, s.Name)
 	}
 
 	return field, nil
 }
 
-func BuildClientConfigFromSecret(clientset *kubernetes.Clientset, appConfig *configuration.Config) (*rest.Config, error) {
-	o, err := GetSecretField(clientset, appConfig)
+func BuildClientConfigFromSecret(opArgs OperationArgs) (*rest.Config, error) {
+	o, err := GetSecretField(opArgs)
 	if err != nil {
 		return nil, err
 	}

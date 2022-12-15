@@ -3,11 +3,9 @@ package generator
 import (
 	"fmt"
 
-	"k8s.io/client-go/kubernetes"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 
-	"github.com/radekg/proxy-kubeconfig-generator/pkg/configuration"
-	"github.com/radekg/proxy-kubeconfig-generator/pkg/utils"
+	"github.com/radekg/proxy-kubeconfig-generator/pkg/k8s"
 )
 
 const (
@@ -19,10 +17,10 @@ const (
 // Generates a Secret containing a Kubeconfig with the specified
 // Service Account's token and server URL and CA certificate from
 // the specified Secret.
-func GenerateProxyKubeconfigFromSA(clientset *kubernetes.Clientset, appConfig *configuration.Config) (*clientcmdapi.Config, error) {
+func GenerateProxyKubeconfigFromSA(opArgs k8s.OperationArgs) (*clientcmdapi.Config, error) {
 	/* serviceAccountName string, namespace string, server string, serverTLSSecretName string, serverTLSSecretCAKey string, serverTLSSecretNamespace string, kubeconfigSecretKey string*/
 	// Get Tenant Service Account token
-	saSecret, err := utils.GetServiceAccountSecret(clientset, appConfig)
+	saSecret, err := k8s.GetServiceAccountSecret(opArgs)
 	if err != nil {
 		return nil, err
 	}
@@ -31,13 +29,13 @@ func GenerateProxyKubeconfigFromSA(clientset *kubernetes.Clientset, appConfig *c
 	}
 
 	// Get Server Proxy CA certificate
-	proxyCA, err := utils.GetSecretField(clientset, appConfig)
+	proxyCA, err := k8s.GetSecretField(opArgs)
 	if err != nil {
 		return nil, err
 	}
 
 	// Generate the client Config for the Tenant Owner
-	tenantConfig, err := utils.BuildKubeconfigFromToken(saSecret.Data["token"], proxyCA, appConfig)
+	tenantConfig, err := k8s.BuildKubeconfigFromToken(saSecret.Data["token"], proxyCA, opArgs)
 	if err != nil {
 		return nil, err
 	}
