@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app.kubernetes.io/component: proxy-kubeconfig-generator
+    app.kubernetes.io/created-by: proxy-kubeconfig-generator
+    app.kubernetes.io/instance: proxy-kubeconfig-generator
+    app.kubernetes.io/part-of: proxy-kubeconfig-generator
+  name: proxy-kubeconfig-generator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: proxy-kubeconfig-generator
+      app.kubernetes.io/created-by: proxy-kubeconfig-generator
+      app.kubernetes.io/instance: proxy-kubeconfig-generator
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: proxy-kubeconfig-generator
+        app.kubernetes.io/created-by: proxy-kubeconfig-generator
+        app.kubernetes.io/instance: proxy-kubeconfig-generator
+        app.kubernetes.io/part-of: proxy-kubeconfig-generator
+    spec:
+      containers:
+      - name: generator
+        args:
+        - --serviceaccount=gitops-reconciler
+        - --namespace=default
+        - --server=https://capsule-proxy.capsule-system.svc:9001
+        - --server-tls-secret-name=capsule-proxy
+        - --server-tls-secret-namespace=capsule-system
+        command:
+        - /generator
+        image: generator:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 10000
+          name: http
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 10000
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 10000
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        resources:
+          limits:
+            cpu: 500m
+            memory: 128Mi
+          requests:
+            cpu: 10m
+            memory: 64Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+      securityContext:
+        runAsNonRoot: true
+      serviceAccountName: generator
+      terminationGracePeriodSeconds: 10
