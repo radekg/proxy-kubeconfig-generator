@@ -180,5 +180,8 @@ func runOnce(ctx context.Context, opArgs k8s.OperationArgs) map[string]error {
 			continue
 		}
 	}
+
+	metrics.RecordRunCount()
+
 	return errors
 }

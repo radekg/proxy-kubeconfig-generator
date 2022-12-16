@@ -90,18 +90,6 @@ var (
 		"gen_target_secret_namespace"})
 )
 
-func init() {
-
-	prometheus.MustRegister(secretCreateSuccessTotal, secretCreateFailedTotal)
-	prometheus.MustRegister(secretUpdateSuccessTotal, secretUpdateFailedTotal)
-	prometheus.MustRegister(generatorNamespaceCount, generatorRunCount)
-	prometheus.MustRegister(latencyNamespacesLoad,
-		latencySourceSecretLoad,
-		latencyTargetSecretCreate,
-		latencyTargetSecretUpdate)
-
-}
-
 func RecordCreateSuccess(appConfig *configuration.Config, namespace string) {
 	secretCreateSuccessTotal.WithLabelValues(
 		configuration.AppRevision(),
