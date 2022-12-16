@@ -81,7 +81,7 @@ func CreateOrUpdateKubeConfigSecret(ctx context.Context, targetNamespace string,
 		metav1.GetOptions{})
 
 	if err != nil {
-		if !apiErrors.IsAlreadyExists(err) {
+		if !apiErrors.IsAlreadyExists(err) && !apiErrors.IsNotFound(err) {
 			opArgs.Logger().Error("Failed checking if secret exists",
 				"namespace", targetNamespace,
 				"secret-name", opArgs.AppConfig().TenantSecretName(),
