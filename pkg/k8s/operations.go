@@ -109,6 +109,8 @@ func CreateOrUpdateKubeConfigSecret(ctx context.Context, targetNamespace string,
 			return nil
 		}
 
+		existingSecretSourceVersion := "<not set>"
+
 		if targetLastKnownRevision, labelExists := existingSecret.Labels[opArgs.AppConfig().SourceSecretRevisionLabel]; labelExists {
 			if targetLastKnownRevision == sourceResourceRevision {
 				opArgs.Logger().Info("Nothing to do, secret already exists and and was generated using current source secret resource version",
@@ -117,6 +119,7 @@ func CreateOrUpdateKubeConfigSecret(ctx context.Context, targetNamespace string,
 					"source-secret-resource-version", sourceResourceRevision)
 				return nil
 			}
+			existingSecretSourceVersion = targetLastKnownRevision
 		}
 
 		opArgs.Logger().Info("Secret will be updated",
@@ -164,6 +167,13 @@ func CreateOrUpdateKubeConfigSecret(ctx context.Context, targetNamespace string,
 			return err
 		}
 
+		opArgs.Logger().Info("Secret updated",
+			"target-namespace", opArgs.AppConfig().TenantSecretName(),
+			"secret-name", opArgs.AppConfig().TenantSecretName(),
+			"secret-key", opArgs.AppConfig().KubeConfigSecretKey,
+			"old-resource-version", existingSecretSourceVersion,
+			"new-resource-version", sourceResourceRevision)
+
 		return nil // end of update
 
 	}
@@ -202,6 +212,12 @@ func CreateOrUpdateKubeConfigSecret(ctx context.Context, targetNamespace string,
 			"reason", err)
 		return err
 	}
+
+	opArgs.Logger().Info("Secret created",
+		"target-namespace", opArgs.AppConfig().TenantSecretName(),
+		"secret-name", opArgs.AppConfig().TenantSecretName(),
+		"secret-key", opArgs.AppConfig().KubeConfigSecretKey,
+		"source-secret-resource-version", sourceResourceRevision)
 
 	return nil
 }
