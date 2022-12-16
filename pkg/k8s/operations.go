@@ -93,6 +93,12 @@ func CreateOrUpdateKubeConfigSecret(ctx context.Context, targetNamespace string,
 		}
 	}
 
+	opArgs.Logger().Debug("Update or create target secret",
+		"namespace", targetNamespace,
+		"secret-name", opArgs.AppConfig().TenantSecretName(),
+		"existing-secret", existingSecret,
+		"existing-secret-check-error-status", err)
+
 	configBuffer, err := clientcmd.Write(*kubeconfig)
 	if err != nil {
 		opArgs.Logger().Error("Failed serializing kubeconfig to buffer",

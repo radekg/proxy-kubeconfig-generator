@@ -7,40 +7,22 @@ import (
 )
 
 var (
-	secretCreateSuccessTotal = promauto.NewCounterVec(prometheus.CounterOpts{
-		Name: "proxy_kubeconfig_generator_create_success_total",
-		Help: "Proxy kubeconfig generator successful secret creation count",
+	secretSuccessTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "proxy_kubeconfig_generator_success_total",
+		Help: "Proxy kubeconfig generator successful secret operation creation count",
 	}, []string{"app_revision",
+		"operation",
 		"gen_service_account_name",
 		"gen_source_secret_name",
 		"gen_source_secret_namespace",
 		"gen_target_secret_name",
 		"gen_target_secret_namespace"})
 
-	secretCreateFailedTotal = promauto.NewCounterVec(prometheus.CounterOpts{
-		Name: "proxy_kubeconfig_generator_create_failed_total",
-		Help: "Proxy kubeconfig generator failed secret creation count",
+	secretFailedTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "proxy_kubeconfig_generator_failed_total",
+		Help: "Proxy kubeconfig generator failed secret operation count",
 	}, []string{"app_revision",
-		"gen_service_account_name",
-		"gen_source_secret_name",
-		"gen_source_secret_namespace",
-		"gen_target_secret_name",
-		"gen_target_secret_namespace"})
-
-	secretUpdateSuccessTotal = promauto.NewCounterVec(prometheus.CounterOpts{
-		Name: "proxy_kubeconfig_generator_update_success_total",
-		Help: "Proxy kubeconfig generator successful secret update count",
-	}, []string{"app_revision",
-		"gen_service_account_name",
-		"gen_source_secret_name",
-		"gen_source_secret_namespace",
-		"gen_target_secret_name",
-		"gen_target_secret_namespace"})
-
-	secretUpdateFailedTotal = promauto.NewCounterVec(prometheus.CounterOpts{
-		Name: "proxy_kubeconfig_generator_update_failed_total",
-		Help: "Proxy kubeconfig generator failed secret update count",
-	}, []string{"app_revision",
+		"operation",
 		"gen_service_account_name",
 		"gen_source_secret_name",
 		"gen_source_secret_namespace",
@@ -69,20 +51,11 @@ var (
 		"gen_source_secret_name",
 		"gen_source_secret_namespace"})
 
-	latencyTargetSecretCreate = promauto.NewHistogramVec(prometheus.HistogramOpts{
-		Name: "proxy_kubeconfig_generator_target_secret_create_ms",
-		Help: "Target secret Kubernetes API create call latency",
+	latencyTargetSecretOperation = promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Name: "proxy_kubeconfig_generator_target_secret_operation_ms",
+		Help: "Target secret Kubernetes API operation call latency",
 	}, []string{"app_revision",
-		"gen_service_account_name",
-		"gen_source_secret_name",
-		"gen_source_secret_namespace",
-		"gen_target_secret_name",
-		"gen_target_secret_namespace"})
-
-	latencyTargetSecretUpdate = promauto.NewHistogramVec(prometheus.HistogramOpts{
-		Name: "proxy_kubeconfig_generator_target_secret_update_ms",
-		Help: "Target secret Kubernetes API update call latency",
-	}, []string{"app_revision",
+		"operation",
 		"gen_service_account_name",
 		"gen_source_secret_name",
 		"gen_source_secret_namespace",
@@ -91,8 +64,9 @@ var (
 )
 
 func RecordCreateSuccess(appConfig *configuration.Config, namespace string) {
-	secretCreateSuccessTotal.WithLabelValues(
+	secretSuccessTotal.WithLabelValues(
 		configuration.AppRevision(),
+		"create",
 		appConfig.ServiceAccountName,
 		appConfig.ServerTLSSecretName,
 		appConfig.ServerTLSSecretNamespace,
@@ -101,8 +75,9 @@ func RecordCreateSuccess(appConfig *configuration.Config, namespace string) {
 }
 
 func RecordCreateFailure(appConfig *configuration.Config, namespace string) {
-	secretCreateFailedTotal.WithLabelValues(
+	secretFailedTotal.WithLabelValues(
 		configuration.AppRevision(),
+		"create",
 		appConfig.ServiceAccountName,
 		appConfig.ServerTLSSecretName,
 		appConfig.ServerTLSSecretNamespace,
@@ -111,8 +86,9 @@ func RecordCreateFailure(appConfig *configuration.Config, namespace string) {
 }
 
 func RecordUpdateSuccess(appConfig *configuration.Config, namespace string) {
-	secretUpdateSuccessTotal.WithLabelValues(
+	secretSuccessTotal.WithLabelValues(
 		configuration.AppRevision(),
+		"update",
 		appConfig.ServiceAccountName,
 		appConfig.ServerTLSSecretName,
 		appConfig.ServerTLSSecretNamespace,
@@ -121,8 +97,9 @@ func RecordUpdateSuccess(appConfig *configuration.Config, namespace string) {
 }
 
 func RecordUpdateFailure(appConfig *configuration.Config, namespace string) {
-	secretUpdateFailedTotal.WithLabelValues(
+	secretFailedTotal.WithLabelValues(
 		configuration.AppRevision(),
+		"update",
 		appConfig.ServiceAccountName,
 		appConfig.ServerTLSSecretName,
 		appConfig.ServerTLSSecretNamespace,
@@ -153,8 +130,9 @@ func RecordSourceSecretLoadLatency(appConfig *configuration.Config, value float6
 }
 
 func RecordTargetSecretCreateLatency(appConfig *configuration.Config, namespace string, value float64) {
-	latencyTargetSecretCreate.WithLabelValues(
+	latencyTargetSecretOperation.WithLabelValues(
 		configuration.AppRevision(),
+		"create",
 		appConfig.ServiceAccountName,
 		appConfig.ServerTLSSecretName,
 		appConfig.ServerTLSSecretNamespace,
@@ -163,8 +141,9 @@ func RecordTargetSecretCreateLatency(appConfig *configuration.Config, namespace 
 }
 
 func RecordTargetSecretUpdateLatency(appConfig *configuration.Config, namespace string, value float64) {
-	latencyTargetSecretUpdate.WithLabelValues(
+	latencyTargetSecretOperation.WithLabelValues(
 		configuration.AppRevision(),
+		"update",
 		appConfig.ServiceAccountName,
 		appConfig.ServerTLSSecretName,
 		appConfig.ServerTLSSecretNamespace,
