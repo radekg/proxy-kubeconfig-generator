@@ -75,13 +75,16 @@ func BuildKubernetesClientConfig(logger hclog.Logger) (*rest.Config, error) {
 // CreateOrUpdateKubeConfigSecret creates or updates a kubeconfig secret in the target namespace.
 func CreateOrUpdateKubeConfigSecret(ctx context.Context, targetNamespace string, opArgs OperationArgs, kubeconfig *clientcmdapi.Config, sourceSecret *corev1.Secret) error {
 
+	hasExistingSecret := true
 	existingSecret, err := opArgs.ClientSet().CoreV1().Secrets(targetNamespace).Get(
 		ctx,
 		opArgs.AppConfig().TenantSecretName(),
 		metav1.GetOptions{})
 
 	if err != nil {
-		if !apiErrors.IsAlreadyExists(err) && !apiErrors.IsNotFound(err) {
+		if apiErrors.IsNotFound(err) {
+			hasExistingSecret = false
+		} else if !apiErrors.IsAlreadyExists(err) {
 			opArgs.Logger().Error("Failed checking if secret exists",
 				"namespace", targetNamespace,
 				"secret-name", opArgs.AppConfig().TenantSecretName(),
@@ -99,7 +102,7 @@ func CreateOrUpdateKubeConfigSecret(ctx context.Context, targetNamespace string,
 
 	sourceResourceRevision := fmt.Sprintf("%s_%d", sourceSecret.ResourceVersion, sourceSecret.Generation)
 
-	if existingSecret != nil {
+	if hasExistingSecret {
 
 		if opArgs.AppConfig().DisallowUpdates {
 			opArgs.Logger().Info("Secret exists and updates are disabled",
@@ -169,7 +172,8 @@ func CreateOrUpdateKubeConfigSecret(ctx context.Context, targetNamespace string,
 		if err != nil {
 
 			opArgs.Logger().Error("Failed updating secret",
-				"target-namespace", opArgs.AppConfig().TenantSecretName(),
+				"target-namespace", targetNamespace,
+				"target-secret-name", opArgs.AppConfig().TenantSecretName(),
 				"source-secret-resource-version", existingSecret.Generation,
 				"source-secret-resource-version", sourceResourceRevision,
 				"secret-key", opArgs.AppConfig().KubeConfigSecretKey,
@@ -178,7 +182,8 @@ func CreateOrUpdateKubeConfigSecret(ctx context.Context, targetNamespace string,
 		}
 
 		opArgs.Logger().Info("Secret updated",
-			"target-namespace", opArgs.AppConfig().TenantSecretName(),
+			"target-namespace", targetNamespace,
+			"target-secret-name", opArgs.AppConfig().TenantSecretName(),
 			"secret-name", opArgs.AppConfig().TenantSecretName(),
 			"secret-key", opArgs.AppConfig().KubeConfigSecretKey,
 			"old-resource-version", existingSecretSourceVersion,
