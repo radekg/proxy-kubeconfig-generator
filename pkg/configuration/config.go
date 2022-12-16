@@ -7,6 +7,17 @@ import (
 	"github.com/hashicorp/go-hclog"
 )
 
+var appRevisionUtc = ""
+
+func init() {
+	appRevisionUtc = fmt.Sprintf("%d", time.Now().UTC().Unix())
+}
+
+// AppRevision returns global app revision (ID of the run).
+func AppRevision() string {
+	return appRevisionUtc
+}
+
 const (
 	// DefaultTLSecretCAKey is the default TLS secret CA key.
 	DefaultTLSecretCAKey = "ca.crt"

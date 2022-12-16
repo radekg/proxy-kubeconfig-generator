@@ -3,8 +3,10 @@ package k8s
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/hashicorp/go-hclog"
+	"github.com/radekg/proxy-kubeconfig-generator/pkg/metrics"
 	corev1 "k8s.io/api/core/v1"
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -152,12 +154,20 @@ func CreateOrUpdateKubeConfigSecret(ctx context.Context, targetNamespace string,
 			return nil
 		}
 
+		updateBenchStart := time.Now().UTC().UnixMilli()
+
 		_, err = opArgs.ClientSet().CoreV1().Secrets(targetNamespace).Update(
 			ctx,
 			secretToUpdate,
 			metav1.UpdateOptions{},
 		)
+
+		metrics.RecordTargetSecretUpdateLatency(opArgs.AppConfig(),
+			targetNamespace,
+			float64(time.Now().UnixMilli()-updateBenchStart))
+
 		if err != nil {
+
 			opArgs.Logger().Error("Failed updating secret",
 				"target-namespace", opArgs.AppConfig().TenantSecretName(),
 				"source-secret-resource-version", existingSecret.Generation,
@@ -200,12 +210,20 @@ func CreateOrUpdateKubeConfigSecret(ctx context.Context, targetNamespace string,
 		return nil
 	}
 
+	createBenchStart := time.Now().UTC().UnixMilli()
+
 	_, err = opArgs.ClientSet().CoreV1().Secrets(targetNamespace).Create(
 		ctx,
 		secret,
 		metav1.CreateOptions{},
 	)
+
+	metrics.RecordTargetSecretCreateLatency(opArgs.AppConfig(),
+		targetNamespace,
+		float64(time.Now().UnixMilli()-createBenchStart))
+
 	if err != nil {
+		metrics.RecordCreateFailure(opArgs.AppConfig(), targetNamespace)
 		opArgs.Logger().Error("Failed creating secret",
 			"target-namespace", opArgs.AppConfig().TenantSecretName(),
 			"secret-key", opArgs.AppConfig().KubeConfigSecretKey,
@@ -213,6 +231,7 @@ func CreateOrUpdateKubeConfigSecret(ctx context.Context, targetNamespace string,
 		return err
 	}
 
+	metrics.RecordCreateSuccess(opArgs.AppConfig(), targetNamespace)
 	opArgs.Logger().Info("Secret created",
 		"target-namespace", opArgs.AppConfig().TenantSecretName(),
 		"secret-name", opArgs.AppConfig().TenantSecretName(),
@@ -266,6 +285,11 @@ func GetServiceAccountSecret(ctx context.Context, targetNamespace string, opArgs
 
 // GetSourceSecret loads the source secret.
 func GetSourceSecret(opArgs OperationArgs) (*corev1.Secret, error) {
+	benchStart := time.Now().UTC().UnixMilli()
+	defer func() {
+		metrics.RecordSourceSecretLoadLatency(opArgs.AppConfig(),
+			float64(time.Now().UTC().UnixMilli()-benchStart))
+	}()
 	s, err := opArgs.ClientSet().CoreV1().Secrets(opArgs.AppConfig().ServerTLSSecretNamespace).Get(
 		context.Background(),
 		opArgs.AppConfig().ServerTLSSecretName,

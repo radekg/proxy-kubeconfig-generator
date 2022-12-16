@@ -165,20 +165,20 @@ func runOnce(ctx context.Context, opArgs k8s.OperationArgs) map[string]error {
 				"selectors", appConfig.TargetNamespaceSelector.Values)
 		}
 	}
+
+	metrics.RecordNamespaceCount(float64(len(namespaces)))
+
 	for _, ns := range namespaces {
 		sourceSecret, tenantConfig, err := generator.GenerateProxyKubeConfigFromSA(ctx, ns, opArgs)
 		if err != nil { // Logging taken care of.
-			metrics.RecordFailure(appConfig, ns)
 			errors[ns] = err
 			continue
 		}
 		err = k8s.CreateOrUpdateKubeConfigSecret(ctx, ns, opArgs, tenantConfig, sourceSecret)
 		if err != nil { // Logging taken care of.
-			metrics.RecordFailure(appConfig, ns)
 			errors[ns] = err
 			continue
 		}
-		metrics.RecordSuccess(appConfig, ns)
 	}
 	return errors
 }
