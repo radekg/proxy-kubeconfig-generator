@@ -95,7 +95,7 @@ func CreateOrUpdateKubeConfigSecret(ctx context.Context, targetNamespace string,
 		return err
 	}
 
-	sourceResourceRevision := fmt.Sprintf("%s:%d", sourceSecret.ResourceVersion, sourceSecret.Generation)
+	sourceResourceRevision := fmt.Sprintf("%s_%d", sourceSecret.ResourceVersion, sourceSecret.Generation)
 
 	if existingSecret != nil {
 
